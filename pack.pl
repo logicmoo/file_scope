@@ -1,5 +1,5 @@
 name(file_scope).
-version('0.0.7').
+version('0.0.8').
 title('File local scoped efects').
 keywords([source]).
 author( 'Douglas Miles', 'http://www.linkedin.com/in/logicmoo' ).
