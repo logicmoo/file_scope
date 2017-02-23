@@ -4,7 +4,7 @@ File local scoped efects
 
 ```prolog
 
-:- pack_install('https://github.com/TeamSPoon/pack_file_scope.git').
+:- pack_install('https://github.com/TeamSPoon/file_scope.git').
 
 ```
 
