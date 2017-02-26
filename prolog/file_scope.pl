@@ -105,7 +105,7 @@ file_local_flag(dialect_pfc).
 file_local_flag(virtual_stubs).
 
 begin_file_scope :- loading_source_file(File),begin_file_scope(File).
-begin_file_scope(File):- dmsg(begin_file_scope(File)),
+begin_file_scope(File):- nop(dmsg(begin_file_scope(File))),
   forall(file_local_flag(Flag),
      ignore((current_prolog_flag(Flag,Value), call_on_eof(File,set_prolog_flag(Flag,Value))))).
   
@@ -127,6 +127,7 @@ loading_source_file0(File):- prolog_load_context(file,File).
 loading_source_file0(File):- loading_file(File).
 loading_source_file0(File):- '$current_source_module'(Module),module_property(Module, file(File)).
 loading_source_file0(File):- '$current_typein_module'(Module),module_property(Module, file(File)).
+loading_source_file0(unknown).
 
 
 :- dynamic(t_l:eof_hook/3).
@@ -164,7 +165,7 @@ signal_eom(Module):- must(prolog_load_context(module,Module)),
    must((forall(clause(GETTER,Body,Ref),(qdmsg(eof_hook(GETTER:-Body)),
         doall((forall(Body,  ((qdmsg(eof_hook(Module:on_f_log_ignore(GETTER))),
         show_failure(eom_action(Module),Module:on_f_log_ignore(WasM:TODO))))))),ignore(erase(Ref)))))),fail.
-signal_eom(Module):- dmsg(signal_eom(Module)),!.
+signal_eom(Module):- nop(dmsg(signal_eom(Module))),!.
 
 
 %% do_eof_actions(+Module,+File) is det.
@@ -177,7 +178,7 @@ do_eof_actions(Module,File):- must(prolog_load_context(module,Module)),
    must((forall(clause(GETTER,Body,Ref),(qdmsg(eof_hook(GETTER:-Body)),
         doall((forall(Body,  ((qdmsg(eof_hook(Module:on_f_log_ignore(GETTER))),
         show_failure(signal_eom(Module),Module:on_f_log_ignore(WasM:TODO))))))),ignore(erase(Ref)))))),fail.
-do_eof_actions(Module,File):- dmsg(do_eof_actions(Module,File)),!.
+do_eof_actions(Module,File):- nop(dmsg(do_eof_actions(Module,File))),!.
 
 
 
@@ -243,6 +244,14 @@ add_did_id((did(List),Body),Option,(did(List2),Body)):- compound(List),
 add_did_id(NewBody,Option,(did([Option]),NewBody)).
 
 did(_).
+
+:- ignore((source_location(S,_),prolog_load_context(module,M),module_property(M,class(library)),
+ forall(source_file(M:H,S),
+ ignore((functor(H,F,A),
+  ignore(((\+ atom_concat('$',_,F),(export(F/A) , current_predicate(system:F/A)->true; system:import(M:F/A))))),
+  ignore(((\+ predicate_property(M:H,transparent), module_transparent(M:F/A), \+ atom_concat('__aux',_,F),debug(modules,'~N:- module_transparent((~q)/~q).~n',[F,A]))))))))).
+
+ 
 
 :-meta_predicate(term_expansion_option(:,+,-)).
 term_expansion_option(Option,(:-Body),Out):- 
