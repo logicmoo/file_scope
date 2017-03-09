@@ -67,6 +67,9 @@ Thread.
 
 :- set_module(class(library)).
 
+:- use_module(library(must_trace)).
+:- use_module(library(logicmoo_util_terms)).
+
 :- thread_local('$file_scope':opened_file/2).
 
 :- meta_predicate(call_on_eof(:)).
@@ -100,9 +103,13 @@ Thread.
 
 :- thread_local(t_l:pretend_loading_file/1).
 
-:- set_prolog_flag(dialect_pfc,default).
 file_local_flag(dialect_pfc).
+file_local_flag(subclause_expansion).
 file_local_flag(virtual_stubs).
+
+ % :- set_prolog_flag(subclause_expansion,default).
+ % :- set_prolog_flag_until_eof(virtual_stubs,default).
+ % :- set_prolog_flag(dialect_pfc,default).
 
 begin_file_scope :- loading_source_file(File),begin_file_scope(File).
 begin_file_scope(File):- nop(dmsg(begin_file_scope(File))),
@@ -133,6 +140,11 @@ loading_source_file0(unknown).
 :- dynamic(t_l:eof_hook/3).
 :- thread_local(t_l:eof_hook/3).
 :- export(t_l:eof_hook/3).
+
+
+:- multifile(user:global_eof_hook/3).
+:- dynamic(user:global_eof_hook/3).
+:- export(user:global_eof_hook/3).
 
 
 % trace_if_debug:- flag_call(runtime_debug > true) -> trace;true.
@@ -172,12 +184,20 @@ signal_eom(Module):- nop(dmsg(signal_eom(Module))),!.
 %
 % Do End Of File Actions for Module+File.
 %
-do_eof_actions(Module,File):- must(prolog_load_context(module,Module)),
+
+do_eof_actions(Module,File):-
   % dmsg(info(load_mpred_file_complete(Module:File))),
-   GETTER=t_l:eof_hook(WasM,File,TODO),
-   must((forall(clause(GETTER,Body,Ref),(qdmsg(eof_hook(GETTER:-Body)),
+   GETTER=user:global_eof_hook(WasM,File,TODO),
+   must((forall(clause(GETTER,Body,_Ref),(qdmsg(eof_hook(GETTER:-Body)),
         doall((forall(Body,  ((qdmsg(eof_hook(Module:on_f_log_ignore(GETTER))),
-        show_failure(signal_eom(Module),Module:on_f_log_ignore(WasM:TODO))))))),ignore(erase(Ref)))))),fail.
+        show_failure(signal_eom(Module),Module:on_f_log_ignore(WasM:TODO))))))))))),fail.
+
+do_eof_actions(Module,File):- must(prolog_load_context(module,Module)),
+   % dmsg(info(load_mpred_file_complete(Module:File))),
+    GETTER=t_l:eof_hook(WasM,File,TODO),
+    must((forall(clause(GETTER,Body,Ref),(qdmsg(eof_hook(GETTER:-Body)),
+         doall((forall(Body,  ((qdmsg(eof_hook(Module:on_f_log_ignore(GETTER))),
+         show_failure(signal_eom(Module),Module:on_f_log_ignore(WasM:TODO))))))),ignore(erase(Ref)))))),fail.
 do_eof_actions(Module,File):- nop(dmsg(do_eof_actions(Module,File))),!.
 
 
@@ -204,7 +224,12 @@ assert_until_eof(File,Fact):-
   qdmsg(eof_hook(assert_until_eof,File,Fact)),
   must_det_l((asserta(Fact,Ref),call_on_eof(File,erase(Ref)))).
 
-set_prolog_flag_until_eof(FlagName,Value):- current_prolog_flag(FlagName,Value),!.
+%% set_prolog_flag_until_eof(+FlagName,+Value) is det.
+%
+% Assert Until Eof.
+%
+
+% set_prolog_flag_until_eof(FlagName,Value):- current_prolog_flag(FlagName,Value),!.
 set_prolog_flag_until_eof(FlagName,Value):- \+ current_prolog_flag(FlagName,_),!,
        wdmsg(warn(no_previous_value(set_prolog_flag_until_eof(FlagName,Value)))),
        set_prolog_flag(FlagName,Value).
@@ -245,7 +270,7 @@ add_did_id(NewBody,Option,(did([Option]),NewBody)).
 
 did(_).
 
-:- ignore((source_location(S,_),prolog_load_context(module,M),module_property(M,class(library)),
+:- ignore((source_location(S,_),prolog_load_context(module,M),
  forall(source_file(M:H,S),
  ignore((functor(H,F,A),
   ignore(((\+ atom_concat('$',_,F),(export(F/A) , current_predicate(system:F/A)->true; system:import(M:F/A))))),
