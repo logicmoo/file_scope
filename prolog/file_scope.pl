@@ -105,10 +105,8 @@ Thread.
 
 file_local_flag(dialect_pfc).
 file_local_flag(subclause_expansion).
-file_local_flag(virtual_stubs).
 
  % :- set_prolog_flag(subclause_expansion,default).
- % :- set_prolog_flag_until_eof(virtual_stubs,default).
  % :- set_prolog_flag(dialect_pfc,default).
 
 begin_file_scope :- loading_source_file(File),begin_file_scope(File).
