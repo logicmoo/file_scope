@@ -18,7 +18,7 @@
           assert_until_eof/2,
           assert_until_eof/1,
           set_prolog_flag_until_eof/2,
-          call_on_end_of_module/1, 
+          call_on_eom/1, 
           loading_source_file0/1,
           call_on_eof/1, 
           call_on_eof/2, 
@@ -80,7 +80,7 @@ Thread.
 :- module_transparent((
           assert_until_eof/2,
           assert_until_eof/1,
-          call_on_end_of_module/1, 
+          call_on_eom/1, 
           call_on_eof/1, 
           call_on_eof/2, 
           disable_in_file/1,
@@ -110,6 +110,8 @@ file_local_flag(subclause_expansion).
  % :- set_prolog_flag(dialect_pfc,default).
 
 begin_file_scope :- loading_source_file(File),begin_file_scope(File).
+
+begin_file_scope(File):- (\+ prolog_load_context(source,File); \+ prolog_load_context(file,File)),!.
 begin_file_scope(File):- nop(dmsg(begin_file_scope(File))),
   forall(file_local_flag(Flag),
      ignore((current_prolog_flag(Flag,Value), call_on_eof(File,set_prolog_flag(Flag,Value))))).
@@ -124,20 +126,24 @@ loading_source_file(File):- must(loading_source_file0(File)),!.
 
 :- export(loading_source_file0/1).
 
+end_loading_source_file(File):-  prolog_load_context(file,File).
+
+loading_source_file0(File):- prolog_load_context(source,File), prolog_load_context(file,IFile),IFile\==File,!.
+
 % This is the main file to ensure we only process signal_eof directive at the end of the actual source files
 loading_source_file0(File):- t_l:pretend_loading_file(File).
 loading_source_file0(File):- prolog_load_context(source,File), prolog_load_context(file,File).
 loading_source_file0(File):- prolog_load_context(source,File). % maybe warn the above didnt catch it
-loading_source_file0(File):- prolog_load_context(file,File).
+loading_source_file0(File):- prolog_load_context(file,File),break.
 loading_source_file0(File):- loading_file(File).
 loading_source_file0(File):- '$current_source_module'(Module),module_property(Module, file(File)).
 loading_source_file0(File):- '$current_typein_module'(Module),module_property(Module, file(File)).
 loading_source_file0(unknown).
 
 
-:- dynamic(t_l:eof_hook/3).
-:- thread_local(t_l:eof_hook/3).
-:- export(t_l:eof_hook/3).
+:- dynamic(t_l:eof_hook/2).
+:- thread_local(t_l:eof_hook/2).
+:- export(t_l:eof_hook/2).
 
 
 :- multifile(user:global_eof_hook/3).
@@ -165,16 +171,17 @@ signal_eof(_).
 %
 % Do End Of Module Actions
 %
+signal_eom(_Module):- !.
 signal_eom(Module):- 
   module_property(Module,file(File)),prolog_load_context(file,File),
     \+ \+ ((module_property(Module,file(LittleFile)),LittleFile\==File)),
    must((forall(module_property(Module,file(LittleFile)),must(do_eof_actions(Module,LittleFile))))),fail.
 signal_eom(Module):- must(prolog_load_context(module,Module)),
   % dmsg(info(load_mpred_file_complete(Module:File))),
-   GETTER=t_l:eof_hook(WasM,_File,TODO),
-   must((forall(clause(GETTER,Body,Ref),(qdmsg(eof_hook(GETTER:-Body)),
-        doall((forall(Body,  ((qdmsg(eof_hook(Module:on_f_log_ignore(GETTER))),
-        show_failure(eom_action(Module),Module:on_f_log_ignore(WasM:TODO))))))),ignore(erase(Ref)))))),fail.
+   GETTER=t_l:eof_hook(_File,TODO),
+   must((forall(clause(GETTER,Body,Ref),(qdmsg(found_eom_hook(GETTER:-Body)),
+        doall((forall(Body,  ((qdmsg(do_eof_hook(Module:on_f_log_ignore(GETTER))),
+        show_failure(eom_action(Module),Module:on_f_log_ignore(TODO))))))),ignore(erase(Ref)))))),fail.
 signal_eom(Module):- nop(dmsg(signal_eom(Module))),!.
 
 
@@ -184,18 +191,19 @@ signal_eom(Module):- nop(dmsg(signal_eom(Module))),!.
 %
 
 do_eof_actions(Module,File):-
-  % dmsg(info(load_mpred_file_complete(Module:File))),
-   GETTER=user:global_eof_hook(WasM,File,TODO),
-   must((forall(clause(GETTER,Body,_Ref),(qdmsg(eof_hook(GETTER:-Body)),
-        doall((forall(Body,  ((qdmsg(eof_hook(Module:on_f_log_ignore(GETTER))),
+   qdmsg(info(load_mpred_file_complete(Module:File))),
+   GETTER=user:global_eof_hook(WasM,File,TODO),   
+   must((forall(clause(GETTER,Body,_Ref),(qdmsg(found_eof_hook(GETTER:-Body)),
+        doall((forall(Body,  ((qdmsg(call_eof_hook(Module:on_f_log_ignore(GETTER))),
         show_failure(signal_eom(Module),Module:on_f_log_ignore(WasM:TODO))))))))))),fail.
 
 do_eof_actions(Module,File):- must(prolog_load_context(module,Module)),
-   % dmsg(info(load_mpred_file_complete(Module:File))),
-    GETTER=t_l:eof_hook(WasM,File,TODO),
-    must((forall(clause(GETTER,Body,Ref),(qdmsg(eof_hook(GETTER:-Body)),
-         doall((forall(Body,  ((qdmsg(eof_hook(Module:on_f_log_ignore(GETTER))),
-         show_failure(signal_eom(Module),Module:on_f_log_ignore(WasM:TODO))))))),ignore(erase(Ref)))))),fail.
+   qdmsg(info(load_mpred_file_complete(Module:File))),
+    GETTER=t_l:eof_hook(File,TODO),
+
+    must((forall(clause(GETTER,Body,Ref),(qdmsg(found_eof_hook(GETTER:-Body)),
+         doall((forall(Body,  ((qdmsg(call_eof_hook(Module:on_f_log_ignore(GETTER))),
+         show_failure(signal_eom(Module),Module:on_f_log_ignore(TODO))))))),ignore(erase(Ref)))))),fail.
 do_eof_actions(Module,File):- nop(dmsg(do_eof_actions(Module,File))),!.
 
 
@@ -204,12 +212,15 @@ do_eof_actions(Module,File):- nop(dmsg(do_eof_actions(Module,File))),!.
 %
 %  Whenever at End Of File execute Call
 %
-call_on_eof(Call):- loading_source_file(File), call_on_eof(File,Call).
-call_on_eof(File,Call):- strip_module(Call,Module,P),asserta(t_l:eof_hook(Module,File,P)),
+call_on_eof(Call):- loading_source_file(File)-> call_on_eof(File,Call).
+call_on_eof(File,Call):- strip_module(Call,Module,P),asserta(t_l:eof_hook(File,P)),
+
+   sanity(must(File \== '/home/prologmud_server/lib/swipl/pack/pfc/prolog/pfc2.0/mpred_header.pi')),
+
    must(Module\==logicmoo_util_with_assertions),
    qdmsg(eof_hook(register,Module,File,P)).
 
-call_on_end_of_module(Call):- must(prolog_load_context(source,File)),call_on_eof(File,Call).
+call_on_eom(Call):- must(prolog_load_context(source,File)),call_on_eof(File,Call).
 
 
 %% assert_until_eof( ?Fact) is det.
@@ -229,7 +240,7 @@ assert_until_eof(File,Fact):-
 
 % set_prolog_flag_until_eof(FlagName,Value):- current_prolog_flag(FlagName,Value),!.
 set_prolog_flag_until_eof(FlagName,Value):- \+ current_prolog_flag(FlagName,_),!,
-       wdmsg(warn(no_previous_value(set_prolog_flag_until_eof(FlagName,Value)))),
+       qdmsg(warn(no_previous_value(set_prolog_flag_until_eof(FlagName,Value)))),
        set_prolog_flag(FlagName,Value).
 
 set_prolog_flag_until_eof(FlagName,Value):- 
@@ -310,5 +321,7 @@ notice_file(_,File,LineNo):-
 
 
 system:term_expansion(EOF,Pos,_,_):- nonvar(EOF),nonvar(Pos),
-  source_location(File,LineNo),once(notice_file(EOF,File,LineNo)),fail.
+ prolog_load_context(file,File),
+  source_location(File,LineNo),
+  once(notice_file(EOF,File,LineNo)),fail.
 
