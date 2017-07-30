@@ -17,6 +17,8 @@
           loading_source_file/1,
           assert_until_eof/2,
           assert_until_eof/1,
+          asserta_until_eof/2,
+          asserta_until_eof/1,
           set_prolog_flag_until_eof/2,
           call_on_eom/1, 
           loading_source_file0/1,
@@ -76,6 +78,8 @@ Thread.
 :- meta_predicate(call_on_eof(+,:)).
 :- meta_predicate(assert_until_eof(:)).
 :- meta_predicate(assert_until_eof(+,:)).
+:- meta_predicate(asserta_until_eof(:)).
+:- meta_predicate(asserta_until_eof(+,:)).
 :- meta_predicate(loading_source_file(-)).
 :- module_transparent((
           assert_until_eof/2,
@@ -126,17 +130,17 @@ loading_source_file(File):- must(loading_source_file0(File)),!.
 
 :- export(loading_source_file0/1).
 
-end_loading_source_file(File):-  prolog_load_context(file,File).
-
-loading_source_file0(File):- prolog_load_context(source,File), prolog_load_context(file,IFile),IFile\==File,!.
+% end_loading_source_file(File):-  prolog_load_context(file,File).
 
 % This is the main file to ensure we only process signal_eof directive at the end of the actual source files
 loading_source_file0(File):- t_l:pretend_loading_file(File).
+loading_source_file0(File):- prolog_load_context(source,File), prolog_load_context(file,IFile),IFile\==File,!.
 loading_source_file0(File):- prolog_load_context(source,File), prolog_load_context(file,File).
 loading_source_file0(File):- prolog_load_context(source,File). % maybe warn the above didnt catch it
 loading_source_file0(File):- prolog_load_context(file,File),break.
 loading_source_file0(File):- loading_file(File).
 loading_source_file0(File):- '$current_source_module'(Module),module_property(Module, file(File)).
+loading_source_file0(File):- 'context_module'(Module),module_property(Module, file(File)).
 loading_source_file0(File):- '$current_typein_module'(Module),module_property(Module, file(File)).
 loading_source_file0(unknown).
 
@@ -213,7 +217,7 @@ do_eof_actions(Module,File):- nop(dmsg(do_eof_actions(Module,File))),!.
 %  Whenever at End Of File execute Call
 %
 call_on_eof(Call):- loading_source_file(File)-> call_on_eof(File,Call).
-call_on_eof(File,Call):- strip_module(Call,Module,P),asserta(t_l:eof_hook(File,P)),
+call_on_eof(File,Call):- strip_module(Call,Module,P),asserta(t_l:eof_hook(File,Module:P)),
 
    sanity(must(File \== '/home/prologmud_server/lib/swipl/pack/pfc/prolog/pfc2.0/mpred_header.pi')),
 
@@ -231,6 +235,12 @@ assert_until_eof(Fact):- must_det_l((loading_source_file(File),assert_until_eof(
 
 assert_until_eof(File,Fact):-  
   qdmsg(eof_hook(assert_until_eof,File,Fact)),
+  must_det_l((assertz(Fact,Ref),call_on_eof(File,erase(Ref)))).
+
+asserta_until_eof(Fact):- must_det_l((loading_source_file(File),asserta_until_eof(File,Fact))).
+
+asserta_until_eof(File,Fact):-  
+  qdmsg(eof_hook(asserta_until_eof,File,Fact)),
   must_det_l((asserta(Fact,Ref),call_on_eof(File,erase(Ref)))).
 
 %% set_prolog_flag_until_eof(+FlagName,+Value) is det.
@@ -254,7 +264,7 @@ set_prolog_flag_until_eof(FlagName,Value):-
 file_option_to_db(Option,DB):- 
   retractall(lmfs_data:file_option(Option)),
   asserta(lmfs_data:file_option(Option)),
-  loading_source_file(File),
+  loading_source_file(File),!,
   DBP=..[Option,File],
   DB=t_l:DBP,
   ( predicate_property(DB,defined)->true;(thread_local(DB),volatile(DB))).
