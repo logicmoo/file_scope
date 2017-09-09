@@ -126,7 +126,7 @@ begin_file_scope(File):- nop(dmsg(begin_file_scope(File))),
 % Loading Source File.
 %
 
-loading_source_file(File):- must(loading_source_file0(File)),!.
+loading_source_file(File):- must(loading_source_file0(File0)),!,File=File0.
 
 :- export(loading_source_file0/1).
 
@@ -134,8 +134,8 @@ loading_source_file(File):- must(loading_source_file0(File)),!.
 
 % This is the main file to ensure we only process signal_eof directive at the end of the actual source files
 loading_source_file0(File):- t_l:pretend_loading_file(File).
+loading_source_file0(File):- prolog_load_context(source,File), prolog_load_context(file,File),!.
 loading_source_file0(File):- prolog_load_context(source,File), prolog_load_context(file,IFile),IFile\==File,!.
-loading_source_file0(File):- prolog_load_context(source,File), prolog_load_context(file,File).
 loading_source_file0(File):- prolog_load_context(source,File). % maybe warn the above didnt catch it
 loading_source_file0(File):- prolog_load_context(file,File),break.
 loading_source_file0(File):- loading_file(File).
