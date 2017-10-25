@@ -277,7 +277,7 @@ is_file_enabling(Option):- file_option_to_db(Option,DB),call(DB),!, \+ current_p
 
 contains_eq(USub,Term):- sub_term(Sub,Term),USub=@=Sub.
 
-contains_f(F,Term):- sub_term(Sub,Term),callable(Sub),functor(Sub,F,_).
+contains_f(F,Term):- sub_term(Sub,Term),callable(Sub),cfunctor(Sub,F,_).
 
 
 check_skip_id(Option,_ ,(did(List),_)):- compound(List),!,member(Option,List).
@@ -291,7 +291,7 @@ did(_).
 
 :- ignore((source_location(S,_),prolog_load_context(module,M),
  forall(source_file(M:H,S),
- ignore((functor(H,F,A),
+ ignore((cfunctor(H,F,A),
   ignore(((\+ atom_concat('$',_,F),(export(F/A) , current_predicate(system:F/A)->true; system:import(M:F/A))))),
   ignore(((\+ predicate_property(M:H,transparent), module_transparent(M:F/A), \+ atom_concat('__aux',_,F),debug(modules,'~N:- module_transparent((~q)/~q).~n',[F,A]))))))))).
 
