@@ -323,15 +323,16 @@ system:term_expansion(In,Pos,Out,Pos):- nonvar(Pos),compound(In),functor(In,(:-)
    term_expansion_option(Option,In,Out),!.
 */
 
-notice_file(end_of_file,File,_LineNo):- !,once(signal_eof(File)),
+notice_file(end_of_file,File,_LineNo):- !,must(once(signal_eof(File))),
   retractall('$file_scope':opened_file(File,_)).
 notice_file(_,File,LineNo):- 
   '$file_scope':opened_file(File,_) -> true; 
    (asserta('$file_scope':opened_file(File,LineNo)),begin_file_scope(File)).
 
 
-system:term_expansion(EOF,Pos,_,_):- nonvar(EOF),nonvar(Pos),
- prolog_load_context(file,File),
-  source_location(File,LineNo),
-  once(notice_file(EOF,File,LineNo)),fail.
+system:term_expansion(EOF,Pos,_,_):- 
+ (nonvar(EOF),nonvar(Pos)),
+ (prolog_load_context(file,File)->
+  source_location(File,LineNo)->
+  notice_file(EOF,File,LineNo))->fail.
 
