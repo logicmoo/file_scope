@@ -33,7 +33,7 @@
           signal_eof/0,
           signal_eom/1, 
           check_skip_id/3,
-          did/1,
+          filescope_did/1,
           contains_f/2,
           contains_eq/2,
           term_expansion_option/3,
@@ -69,8 +69,12 @@ Thread.
 
 :- set_module(class(library)).
 
+
 :- use_module(library(must_trace)).
 :- use_module(library(logicmoo_util_terms)).
+
+contains_eq(USub,Term):- sub_term(Sub,Term),USub=@=Sub.
+contains_f(F,Term):- sub_term(Sub,Term),callable(Sub),cfunctor(Sub,F,_).
 
 :- thread_local('$file_scope':opened_file/2).
 
@@ -98,7 +102,7 @@ Thread.
           signal_eof/1, 
           signal_eom/1, 
           check_skip_id/3,
-          did/1,
+          filescope_did/1,
           contains_f/2,
           contains_eq/2,
           term_expansion_option/3,
@@ -217,9 +221,13 @@ do_eof_actions(Module,File):- nop(dmsg(do_eof_actions(Module,File))),!.
 %  Whenever at End Of File execute Call
 %
 call_on_eof(Call):- loading_source_file(File)-> call_on_eof(File,Call).
-call_on_eof(File,Call):- strip_module(Call,Module,P),asserta(t_l:eof_hook(File,Module:P)),
+call_on_eof(File,Call):- strip_module(Call,Module,P),
+    % install our term expander
+    prolog_load_context(module,LoadingModule),
+    LoadingModule:use_module(library(file_scope)),
+    asserta(t_l:eof_hook(File,Module:P)),
 
-   sanity(must(File \== '/home/prologmud_server/lib/swipl/pack/pfc/prolog/pfc2.0/mpred_header.pi')),
+   %sanity(must(File \== '/home/prologmud_server/lib/swipl/pack/pfc/prolog/pfc2.0/mpred_header.pi')),
 
    must(Module\==logicmoo_util_with_assertions),
    qdmsg(eof_hook(register,Module,File,P)).
@@ -275,19 +283,16 @@ disable_in_file(Option):- file_option_to_db(Option,DB),retractall(DB),set_prolog
 
 is_file_enabling(Option):- file_option_to_db(Option,DB),call(DB),!, \+ current_prolog_flag(Option,false).
 
-contains_eq(USub,Term):- sub_term(Sub,Term),USub=@=Sub.
-
-contains_f(F,Term):- sub_term(Sub,Term),callable(Sub),cfunctor(Sub,F,_).
 
 
-check_skip_id(Option,_ ,(did(List),_)):- compound(List),!,member(Option,List).
+check_skip_id(Option,_ ,(filescope_did(List),_)):- compound(List),!,member(Option,List).
 check_skip_id(_,Head ,Body):- ( \+ compound(Body) ; \+ compound(Head)),!.
 
-add_did_id((did(List),Body),Option,(did(List2),Body)):- compound(List),
+add_did_id((filescope_did(List),Body),Option,(filescope_did(List2),Body)):- compound(List),
    ( memberchk(Option,List)->true;List2=[Option|List] ).
-add_did_id(NewBody,Option,(did([Option]),NewBody)).
+add_did_id(NewBody,Option,(filescope_did([Option]),NewBody)).
 
-did(_).
+filescope_did(_).
 
 :- ignore((source_location(S,_),prolog_load_context(module,M),
  forall(source_file(M:H,S),
@@ -327,7 +332,7 @@ notice_file(end_of_file,File,_LineNo):- !,must(once(signal_eof(File))),
   retractall('$file_scope':opened_file(File,_)).
 notice_file(_,File,LineNo):- 
   '$file_scope':opened_file(File,_) -> true; 
-   (asserta('$file_scope':opened_file(File,LineNo)),begin_file_scope(File)).
+   (asserta('$file_scope':opened_file(File,LineNo)),must(once(begin_file_scope(File)))).
 
 
 system:term_expansion(EOF,Pos,_,_):- 
