@@ -294,6 +294,22 @@ add_did_id(NewBody,Option,(filescope_did([Option]),NewBody)).
 
 filescope_did(_).
 
+
+:- if( \+ current_predicate(set_skip_file_expansion/2)).
+:- dynamic(lmcache:skip_file_expansion/2).
+:- dynamic(lmcache:skip_file_expansion/2).
+set_skip_file_expansion(File,TF):-   
+   retractall(lmcache:skip_file_expansion(File,_)),
+   asserta(lmcache:skip_file_expansion(File,TF)),
+   SKIP = (notrace((prolog_load_context(file,S),lmcache:skip_file_expansion(S,true))),!),
+   HEAD1 = term_expansion(X,P,X,P),
+   HEAD2 = term_expansion(X,X),
+   forall(member(M,[file_scope,baseKB,user,system]),
+    (((system:clause(M:HEAD1,WAS),WAS=@=SKIP) -> true ; system:asserta(M:HEAD1:-SKIP)),
+     ((system:clause(M:HEAD2,WAS),WAS=@=SKIP) -> true ; system:asserta(M:HEAD2:-SKIP)))),
+   !.
+:- endif.
+
 :- ignore((source_location(S,_),prolog_load_context(module,M),
  forall(source_file(M:H,S),
  ignore((cfunctor(H,F,A),
